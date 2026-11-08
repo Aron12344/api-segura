@@ -29,7 +29,8 @@ const loginLimiter = rateLimit({
 // 2. Datos de ejemplo (en un sistema real vendrían de una base de datos)
 const users = [
   { id: 1, username: 'admin', passwordHash: bcrypt.hashSync('Admin123!', 10), rol: 'admin' },
-  { id: 2, username: 'vendedor', passwordHash: bcrypt.hashSync('Venta123!', 10), rol: 'usuario' }
+  { id: 2, username: 'vendedor', passwordHash: bcrypt.hashSync('Venta123!', 10), rol: 'usuario' },
+  { id: 3, username: 'supervisor', passwordHash: bcrypt.hashSync('Super123!', 10), rol: 'supervisor' }
 ];
 let productos = [
   { id: 1, nombre: 'Laptop', precio: 2500 },
@@ -70,15 +71,25 @@ app.post('/api/login',
     if (!u || !bcrypt.compareSync(req.body.password, u.passwordHash)) {
       return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
-    const token = jwt.sign({ id: u.id, rol: u.rol }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES || '15m' });
+    const token = jwt.sign({ id: u.id, rol: u.rol }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES || '5m' });
     res.json({ token });
   });
 
 app.get('/api/productos', autenticar, (req, res) => res.json(productos));
 
+app.get('/api/productos/:id',
+  autenticar,
+  param('id').isInt({ min: 1 }).withMessage('id inválido'),
+  validar,
+  (req, res) => {
+    const producto = productos.find(p => p.id === Number(req.params.id));
+    if (!producto) return res.status(404).json({ error: 'Producto no encontrado' });
+    res.json(producto);
+  });
+
 app.post('/api/productos',
   autenticar,
-  soloRol('admin'),
+  soloRol('admin', 'supervisor'),
   body('nombre').isString().trim().isLength({ min: 2, max: 50 }).withMessage('nombre debe tener de 2 a 50 caracteres'),
   body('precio').isFloat({ gt: 0 }).withMessage('precio debe ser un número mayor que 0'),
   validar,
